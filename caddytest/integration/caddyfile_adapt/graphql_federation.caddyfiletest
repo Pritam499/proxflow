@@ -1,0 +1,67 @@
+:8885
+
+graphql_federation {
+	service user_service http://user-service:4001/graphql {
+		schema `
+			type User {
+				id: ID!
+				name: String!
+			}
+			type Query {
+				user(id: ID!): User
+			}
+		`
+	}
+	service product_service http://product-service:4002/graphql {
+		schema `
+			type Product {
+				id: ID!
+				name: String!
+			}
+			type Query {
+				product(id: ID!): Product
+			}
+		`
+	}
+	cache_duration 5m
+	max_query_complexity 1000
+	enable_introspection
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8885"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "graphql_federation",
+									"services": [
+										{
+											"name": "user_service",
+											"url": "http://user-service:4001/graphql",
+											"schema_sdl": "\n\t\t\ttype User {\n\t\t\t\tid: ID!\n\t\t\t\tname: String!\n\t\t\t}\n\t\t\ttype Query {\n\t\t\t\tuser(id: ID!): User\n\t\t\t}\n\t\t"
+										},
+										{
+											"name": "product_service",
+											"url": "http://product-service:4002/graphql",
+											"schema_sdl": "\n\t\t\ttype Product {\n\t\t\t\tid: ID!\n\t\t\t\tname: String!\n\t\t\t}\n\t\t\ttype Query {\n\t\t\t\tproduct(id: ID!): Product\n\t\t\t}\n\t\t"
+										}
+									],
+									"cache_duration": 300000000000,
+									"max_query_complexity": 1000,
+									"enable_introspection": true
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}

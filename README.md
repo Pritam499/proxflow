@@ -73,6 +73,1246 @@
 - [About](#about)
 
 
+## ProxFlow Enhancements
+
+ProxFlow is a cloud-native reverse proxy built on Caddy, featuring advanced load balancing capabilities.
+
+### AI-Powered Load Balancing
+
+ProxFlow introduces an AI-powered load balancing feature that uses machine learning to predict traffic patterns and dynamically adjust load balancing strategies.
+
+#### How it Works
+
+The `adaptive` selection policy collects historical request counts for each upstream server and uses exponential smoothing to predict future load. It then assigns weights inversely proportional to the predicted load, directing more traffic to less busy servers.
+
+#### Configuration
+
+In your Caddyfile, use:
+
+```
+lb_policy adaptive {
+    history_length 10
+    update_interval 1m
+    alpha 0.3
+}
+```
+
+- `history_length`: Number of past intervals to keep for prediction (default 10)
+- `update_interval`: How often to update predictions (default 1m)
+- `alpha`: Smoothing factor for exponential smoothing (0-1, default 0.3)
+
+#### 10-Turn Zed Eval Prompt for AI-Powered Load Balancing
+
+This prompt is designed to evaluate the AI-powered load balancing feature through a 10-turn conversation. It can be used with conversational AIs to assess understanding and implementation.
+
+**Turn 1:** What is the new AI-powered load balancing feature in ProxFlow?
+
+**Turn 2:** How does the adaptive selection policy work?
+
+**Turn 3:** What machine learning technique is used for traffic prediction?
+
+**Turn 4:** How are the weights adjusted based on predictions?
+
+**Turn 5:** What are the configuration options for the adaptive policy?
+
+**Turn 6:** How often does the policy update its predictions?
+
+**Turn 7:** What happens if an upstream has no historical data?
+
+**Turn 8:** How does the policy handle unavailable upstreams?
+
+**Turn 9:** What are the default values for the adaptive policy parameters?
+
+**Turn 10:** How can I monitor the effectiveness of the AI-powered load balancing?
+
+## GraphQL Federation Gateway
+
+ProxFlow includes a GraphQL Federation Gateway that can federate multiple GraphQL services into a unified API endpoint. This is particularly useful in microservices architectures where each service exposes its own GraphQL API.
+
+### Features
+
+- **Schema Stitching**: Automatically merges schemas from multiple GraphQL services.
+- **Intelligent Query Planning**: Plans queries across services for efficient execution.
+- **Caching**: Caches query plans and responses to improve performance.
+- **Complexity Limiting**: Prevents abuse by limiting query complexity.
+- **Introspection Support**: Optional support for GraphQL introspection.
+
+### Configuration
+
+In your Caddyfile:
+
+```
+graphql_federation {
+    service user_service http://user-service:4001/graphql {
+        schema `
+            type User {
+                id: ID!
+                name: String!
+            }
+            type Query {
+                user(id: ID!): User
+            }
+        `
+    }
+    service product_service http://product-service:4002/graphql {
+        schema `
+            type Product {
+                id: ID!
+                name: String!
+            }
+            type Query {
+                product(id: ID!): Product
+            }
+        `
+    }
+    cache_duration 5m
+    max_query_complexity 1000
+    enable_introspection
+}
+```
+
+- `service`: Defines an upstream GraphQL service with name, URL, and schema.
+- `cache_duration`: How long to cache plans and responses (default 5m).
+- `max_query_complexity`: Maximum allowed query complexity (default 1000).
+- `enable_introspection`: Allows GraphQL introspection queries.
+
+### Usage
+
+The gateway exposes a single GraphQL endpoint that can query across all federated services. For example, if you have user and product services, you can query both in a single request.
+
+## Real-Time Traffic Visualization Dashboard
+
+ProxFlow includes a web-based dashboard for real-time traffic monitoring and visualization.
+
+### Features
+
+- **Real-Time Metrics**: Request rates, error rates, and active connections
+- **Latency Monitoring**: P50, P95, P99 latency percentiles
+- **Geographic Distribution**: Requests by region
+- **Live Updates**: Server-Sent Events (SSE) for real-time data streaming
+- **Interactive Dashboard**: Web interface for monitoring traffic patterns
+
+### Configuration
+
+In your Caddyfile:
+
+```
+traffic_dashboard {
+    path /dashboard
+    update_interval 1s
+}
+```
+
+- `path`: The URL path where the dashboard is served (default `/dashboard`)
+- `update_interval`: How often to send updates (default 1s)
+
+### Usage
+
+Navigate to the configured path (e.g., `http://your-server/dashboard`) to view the dashboard. The page will automatically update with real-time traffic data via Server-Sent Events.
+
+## Intelligent Circuit Breaker with Auto Recovery
+
+ProxFlow includes an intelligent circuit breaker that monitors backend health using multiple metrics and provides automatic recovery with traffic ramp-up.
+
+### Features
+
+- **Multi-Metric Monitoring**: Tracks latency, error rates, and timeouts
+- **Automatic Circuit Management**: Opens/closes circuits based on configurable thresholds
+- **Smart Recovery**: Half-open state for testing recovery, followed by ramp-up phase
+- **Traffic Ramp-Up**: Gradual traffic increase during recovery to prevent backend overload
+- **Configurable Parameters**: Thresholds, timeouts, and ramp-up durations
+
+### Configuration
+
+In your Caddyfile, configure per upstream:
+
+```
+reverse_proxy localhost:8080 {
+    circuit_breaker intelligent {
+        failure_threshold 0.5
+        recovery_timeout 60s
+        half_open_max_requests 3
+        latency_threshold 5s
+        min_requests 10
+        evaluation_window 60s
+        ramp_up_duration 30s
+    }
+}
+```
+
+### Parameters
+
+- `failure_threshold`: Failure rate (0-1) to trigger circuit open (default 0.5)
+- `recovery_timeout`: Time to wait before attempting recovery (default 60s)
+- `half_open_max_requests`: Max requests in half-open state (default 3)
+- `latency_threshold`: Latency threshold for slow requests (default 5s)
+- `min_requests`: Minimum requests needed for evaluation (default 10)
+- `evaluation_window`: Time window for metric evaluation (default 60s)
+- `ramp_up_duration`: Duration of traffic ramp-up phase (default 30s)
+
+### Circuit States
+
+1. **Closed**: Normal operation, all requests pass through
+2. **Open**: Circuit is open, requests are blocked
+3. **Half-Open**: Testing recovery with limited requests
+4. **Ramp-Up**: Gradual traffic increase during recovery
+
+## API Gateway with Request Transformation
+
+ProxFlow includes an API gateway with powerful request/response transformation capabilities.
+
+### Features
+
+- **Request/Response Transformation**: Modify headers, body, and structure
+- **Request Enrichment**: Add additional data from external sources
+- **Response Aggregation**: Combine responses from multiple backends
+- **Flexible Matching**: Apply transformations based on request conditions
+
+### Configuration
+
+In your Caddyfile:
+
+```
+transform {
+	header add X-API-Version "v1"
+	body replace user.name "enriched"
+	enrich {
+		data key1 value1
+		from_url https://api.example.com/enrich
+	}
+	aggregate {
+		backend https://backend1.com/api
+		backend https://backend2.com/api
+		combine merge
+	}
+}
+```
+
+### Transformation Types
+
+- **Header Actions**: add, set, delete headers
+- **Body Actions**: replace, append, prepend JSON values
+- **Enrichment**: Add data from external APIs
+- **Aggregation**: Combine multiple backend responses
+
+## Multi-Tenancy with Dynamic Routing
+
+ProxFlow supports multi-tenant architectures with isolated configurations and dynamic tenant management.
+
+### Features
+
+- **Tenant Isolation**: Separate routing, SSL, rate limits, and metrics per tenant
+- **Dynamic Creation**: Create/update tenants via API without restart
+- **Configuration Inheritance**: Tenants can inherit from parent configurations
+- **Domain-based Routing**: Route requests based on domain
+
+### Configuration
+
+In your JSON config:
+
+```json
+{
+  "apps": {
+    "tenants": {
+      "api_endpoint": "/api/tenants",
+      "default_tenant": {
+        "routes": [...],
+        "rate_limit": {"rps": 100}
+      },
+      "tenants": {
+        "tenant1": {
+          "domains": ["tenant1.com"],
+          "inherits": "default",
+          "tls": {...}
+        }
+      }
+    }
+  }
+}
+```
+
+### API Endpoints
+
+- `GET /api/tenants` - List all tenants
+- `POST /api/tenants` - Create a new tenant
+- `GET /api/tenants/{name}` - Get tenant details
+- `PUT /api/tenants/{name}` - Update tenant
+- `DELETE /api/tenants/{name}` - Delete tenant
+
+### Tenant Properties
+
+- **Domains**: Domain names for the tenant
+- **Routes**: HTTP routes and handlers
+- **TLS**: SSL certificate configuration
+- **Rate Limit**: Request rate limiting
+- **Metrics**: Tenant-specific metrics collection
+
+## Advanced Caching with Predictive Warming
+
+ProxFlow includes an advanced caching layer with intelligent features for optimal performance.
+
+### Features
+
+- **Intelligent Caching**: Cache API responses to reduce backend load
+- **Predictive Cache Warming**: Analyze access patterns to preload frequently accessed data
+- **Cache Invalidation via Webhooks**: External systems can invalidate cache entries
+- **Partial Cache Updates**: Update specific parts of cached JSON data
+- **Distributed Cache Synchronization**: Keep cache consistent across multiple instances
+- **Configurable TTL and Size Limits**: Fine-tune cache behavior
+
+### Configuration
+
+In your Caddyfile:
+
+```
+cache {
+    ttl 10m
+    max_size 100
+    predictive_warming
+    webhook_path /cache/invalidate
+    distributed_sync {
+        peer http://peer1:2019
+        peer http://peer2:2019
+        sync_interval 30s
+    }
+}
+```
+
+### Cache Invalidation Webhook
+
+Send POST requests to `/cache/invalidate` with JSON payload:
+
+```json
+{
+  "action": "invalidate",
+  "key": "cache_key"
+}
+```
+
+Or invalidate by pattern:
+
+```json
+{
+  "action": "invalidate",
+  "pattern": "api/users"
+}
+```
+
+### Partial Updates
+
+Update specific JSON fields without invalidating the entire cache entry:
+
+```json
+{
+  "action": "partial_update",
+  "partial": {
+    "key": "user_123",
+    "path": "user.email",
+    "value": "newemail@example.com"
+  }
+}
+```
+
+### Parameters
+
+- `ttl`: Default time-to-live for cache entries (default 5m)
+- `max_size`: Maximum cache size in MB (default 100)
+- `predictive_warming`: Enable predictive cache warming
+- `webhook_path`: Path for cache invalidation webhooks (default /cache/invalidate)
+- `distributed_sync`: Configuration for multi-instance synchronization
+
+## Advanced Rate Limiting
+
+ProxFlow includes advanced rate limiting with multiple algorithms and distributed support.
+
+### Supported Algorithms
+
+- **Token Bucket**: Smooth rate limiting with burst capacity
+- **Leaky Bucket**: Request processing at a constant rate
+- **Sliding Window**: Time-based request counting
+
+### Rate Limiting Keys
+
+- **IP Address**: Rate limit by client IP
+- **User ID**: Rate limit by authenticated user
+- **API Key**: Rate limit by API key
+- **Custom Headers**: Rate limit by any HTTP header
+
+### Configuration
+
+In your Caddyfile:
+
+```
+rate_limit {
+    algorithm token_bucket
+    rate 10
+    burst 5
+    key ip
+    reject 429
+    distributed {
+        redis {
+            address localhost:6379
+            password secret
+            db 0
+        }
+        sync_interval 30s
+    }
+}
+```
+
+### Distributed Rate Limiting
+
+For multi-instance deployments, configure Redis-backed distributed rate limiting:
+
+```caddyfile
+rate_limit {
+    distributed {
+        redis {
+            address redis-cluster:6379
+            password mypassword
+            db 1
+        }
+        sync_interval 15s
+    }
+}
+```
+
+### Rejection Policies
+
+- **429**: Return HTTP 429 Too Many Requests
+- **delay**: Add delay before processing
+- **drop**: Silently drop the request
+
+## Request Replay and Traffic Shadowing
+
+ProxFlow supports traffic shadowing and replay for testing and monitoring.
+
+### Traffic Shadowing
+
+Capture production traffic and mirror it to staging/test environments:
+
+```caddyfile
+traffic_shadow {
+    sampling_rate 0.1
+    compare_responses
+    log_differences
+    target staging http://staging.example.com/api {
+        header X-Shadow true
+        timeout 10s
+        ignore_errors
+    }
+}
+```
+
+### Request Replay
+
+Store and replay captured requests for testing:
+
+```caddyfile
+traffic_shadow {
+    replay {
+        storage {
+            type redis
+            redis {
+                address localhost:6379
+                db 1
+            }
+        }
+        replay_rate 0.5
+        max_replays 5
+    }
+}
+```
+
+### Response Comparison
+
+Automatically compare responses between production and shadow environments to detect regressions:
+
+- Status code comparison
+- Response body comparison
+- Performance timing analysis
+- Configurable similarity thresholds
+
+### Storage Options
+
+- **Memory**: In-memory storage for development
+- **File**: File-based storage for persistence
+- **Redis**: Distributed storage for multi-instance deployments
+
+## Auto-Scaling Backend Pool Management
+
+ProxFlow includes intelligent auto-scaling backend pool management with service discovery integration.
+
+### Features
+
+- **Automatic Scaling**: Add/remove backend instances based on load and health
+- **Multi-Platform Discovery**: Kubernetes, Docker Swarm, and Consul integration
+- **Health Monitoring**: Continuous health checks with customizable thresholds
+- **Load-Based Scaling**: Scale up/down based on backend utilization
+- **Custom Health Checks**: Per-backend health check configuration
+
+### Service Discovery
+
+#### Kubernetes
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type kubernetes
+            kubernetes {
+                namespace default
+                service_name my-app
+                label_selector app=my-app
+            }
+        }
+    }
+}
+```
+
+#### Docker Swarm
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type docker_swarm
+            docker_swarm {
+                service_name my-app
+                network_name my-network
+            }
+        }
+    }
+}
+```
+
+#### Consul
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type consul
+            consul {
+                service_name my-app
+                address consul-server:8500
+                token my-token
+            }
+        }
+    }
+}
+```
+
+### Health Checks
+
+Configure health check parameters:
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        health_checks {
+            path /health
+            interval 30s
+            timeout 5s
+            unhealthy_threshold 3
+            healthy_threshold 2
+        }
+    }
+}
+```
+
+### Auto-Scaling Configuration
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        scaling {
+            min_backends 1
+            max_backends 10
+            scale_up_threshold 0.8
+            scale_down_threshold 0.2
+            scale_cooldown 5m
+            provider kubernetes
+        }
+    }
+}
+```
+
+### Scaling Triggers
+
+- **Scale Up**: When average backend load exceeds `scale_up_threshold`
+- **Scale Down**: When average backend load falls below `scale_down_threshold`
+- **Health-Based**: Remove unhealthy backends, add healthy ones
+- **Cooldown**: Prevent rapid scaling operations
+
+### Supported Providers
+
+- **Kubernetes**: Horizontal Pod Autoscaling (HPA) integration
+- **Docker Swarm**: Service scaling via Docker API
+- **Manual**: Static backend management
+
+## Zero Downtime Certificate Rotation
+
+ProxFlow supports zero downtime certificate rotation with multiple certificate authorities and advanced TLS features.
+
+### Certificate Authorities
+
+- **Let's Encrypt**: Automatic ACME certificates
+- **ZeroSSL**: Alternative ACME provider
+- **Custom CA**: Support for internal certificate authorities
+
+### Advanced TLS Features
+
+- **OCSP Stapling**: Automatic OCSP response stapling for improved performance
+- **Encrypted SNI (ECH)**: Encrypted Client Hello for enhanced privacy
+- **Certificate Pinning**: Pin certificates to prevent man-in-the-middle attacks
+
+### Configuration
+
+```caddyfile
+tls {
+    protocols tls1.2 tls1.3
+    ciphers ECDHE-ECDSA-AES128-GCM-SHA256
+    curves x25519
+}
+```
+
+## gRPC Gateway with Protocol Translation
+
+ProxFlow includes a bidirectional gRPC gateway that translates between HTTP/REST and gRPC protocols.
+
+### Features
+
+- **Protocol Translation**: Automatic conversion between HTTP JSON and gRPC protobuf
+- **Bidirectional Communication**: Support for both request and response translation
+- **Streaming Support**: Handle gRPC streaming methods
+- **gRPC-Web Compatibility**: Support for web browser gRPC calls
+- **Built-in Reflection**: Automatic service discovery and method introspection
+
+### Configuration
+
+In your Caddyfile:
+
+```
+grpc_gateway localhost:50051 {
+    proto_file /path/to/service.proto
+    service user {
+        method GET UserService/GetUser
+        method POST UserService/CreateUser
+        streaming
+    }
+    enable_reflection
+    enable_grpc_web
+    allow_cors
+}
+```
+
+### Usage
+
+The gateway translates REST API calls to gRPC:
+
+```bash
+# REST call
+curl -X POST http://gateway/user/create \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John", "email": "john@example.com"}'
+
+# Becomes gRPC call to UserService.CreateUser
+```
+
+### Protocol Translation
+
+- **Request**: JSON → Protobuf
+- **Response**: Protobuf → JSON
+- **Headers**: HTTP headers ↔ gRPC metadata
+- **Status Codes**: HTTP status ↔ gRPC status codes
+
+## [Features](https://caddyserver.com/features)
+
+ProxFlow includes a GraphQL Federation Gateway that can federate multiple GraphQL services into a unified API endpoint. This is particularly useful in microservices architectures where each service exposes its own GraphQL API.
+
+### Features
+
+- **Schema Stitching**: Automatically merges schemas from multiple GraphQL services.
+- **Intelligent Query Planning**: Plans queries across services for efficient execution.
+- **Caching**: Caches query plans and responses to improve performance.
+- **Complexity Limiting**: Prevents abuse by limiting query complexity.
+- **Introspection Support**: Optional support for GraphQL introspection.
+
+### Configuration
+
+In your Caddyfile:
+
+```
+graphql_federation {
+    service user_service http://user-service:4001/graphql {
+        schema "...user schema SDL..."
+    }
+    service product_service http://product-service:4002/graphql {
+        schema "...product schema SDL..."
+    }
+    cache_duration 5m
+    max_query_complexity 1000
+    enable_introspection
+}
+```
+
+- `service`: Defines an upstream GraphQL service with name, URL, and schema.
+- `cache_duration`: How long to cache plans and responses (default 5m).
+- `max_query_complexity`: Maximum allowed query complexity (default 1000).
+- `enable_introspection`: Allows GraphQL introspection queries.
+
+### Usage
+
+The gateway exposes a single GraphQL endpoint that can query across all federated services. For example, if you have user and product services, you can query both in a single request.
+
+## Real-Time Traffic Visualization Dashboard
+
+ProxFlow includes a web-based dashboard for real-time traffic monitoring and visualization.
+
+### Features
+
+- **Real-Time Metrics**: Request rates, error rates, and active connections
+- **Latency Monitoring**: P50, P95, P99 latency percentiles
+- **Geographic Distribution**: Requests by region
+- **Live Updates**: Server-Sent Events (SSE) for real-time data streaming
+- **Interactive Dashboard**: Web interface for monitoring traffic patterns
+
+### Configuration
+
+In your Caddyfile:
+
+```
+traffic_dashboard {
+    path /dashboard
+    update_interval 1s
+}
+```
+
+- `path`: The URL path where the dashboard is served (default `/dashboard`)
+- `update_interval`: How often to send updates (default 1s)
+
+### Usage
+
+Navigate to the configured path (e.g., `http://your-server/dashboard`) to view the dashboard. The page will automatically update with real-time traffic data via Server-Sent Events.
+
+## Intelligent Circuit Breaker with Auto Recovery
+
+ProxFlow includes an intelligent circuit breaker that monitors backend health using multiple metrics and provides automatic recovery with traffic ramp-up.
+
+### Features
+
+- **Multi-Metric Monitoring**: Tracks latency, error rates, and timeouts
+- **Automatic Circuit Management**: Opens/closes circuits based on configurable thresholds
+- **Smart Recovery**: Half-open state for testing recovery, followed by ramp-up phase
+- **Traffic Ramp-Up**: Gradual traffic increase during recovery to prevent backend overload
+- **Configurable Parameters**: Thresholds, timeouts, and ramp-up durations
+
+### Configuration
+
+In your Caddyfile, configure per upstream:
+
+```
+reverse_proxy localhost:8080 {
+    circuit_breaker intelligent {
+        failure_threshold 0.5
+        recovery_timeout 60s
+        half_open_max_requests 3
+        latency_threshold 5s
+        min_requests 10
+        evaluation_window 60s
+        ramp_up_duration 30s
+    }
+}
+```
+
+### Parameters
+
+- `failure_threshold`: Failure rate (0-1) to trigger circuit open (default 0.5)
+- `recovery_timeout`: Time to wait before attempting recovery (default 60s)
+- `half_open_max_requests`: Max requests in half-open state (default 3)
+- `latency_threshold`: Latency threshold for slow requests (default 5s)
+- `min_requests`: Minimum requests needed for evaluation (default 10)
+- `evaluation_window`: Time window for metric evaluation (default 60s)
+- `ramp_up_duration`: Duration of traffic ramp-up phase (default 30s)
+
+### Circuit States
+
+1. **Closed**: Normal operation, all requests pass through
+2. **Open**: Circuit is open, requests are blocked
+3. **Half-Open**: Testing recovery with limited requests
+4. **Ramp-Up**: Gradual traffic increase during recovery
+
+## API Gateway with Request Transformation
+
+ProxFlow includes an API gateway with powerful request/response transformation capabilities.
+
+### Features
+
+- **Request/Response Transformation**: Modify headers, body, and structure
+- **Request Enrichment**: Add additional data from external sources
+- **Response Aggregation**: Combine responses from multiple backends
+- **Flexible Matching**: Apply transformations based on request conditions
+
+### Configuration
+
+In your Caddyfile:
+
+```
+transform {
+	header add X-API-Version "v1"
+	body replace user.name "enriched"
+	enrich {
+		data key1 value1
+		from_url https://api.example.com/enrich
+	}
+	aggregate {
+		backend https://backend1.com/api
+		backend https://backend2.com/api
+		combine merge
+	}
+}
+```
+
+### Transformation Types
+
+- **Header Actions**: add, set, delete headers
+- **Body Actions**: replace, append, prepend JSON values
+- **Enrichment**: Add data from external APIs
+- **Aggregation**: Combine multiple backend responses
+
+## Multi-Tenancy with Dynamic Routing
+
+ProxFlow supports multi-tenant architectures with isolated configurations and dynamic tenant management.
+
+### Features
+
+- **Tenant Isolation**: Separate routing, SSL, rate limits, and metrics per tenant
+- **Dynamic Creation**: Create/update tenants via API without restart
+- **Configuration Inheritance**: Tenants can inherit from parent configurations
+- **Domain-based Routing**: Route requests based on domain
+
+### Configuration
+
+In your JSON config:
+
+```json
+{
+  "apps": {
+    "tenants": {
+      "api_endpoint": "/api/tenants",
+      "default_tenant": {
+        "routes": [...],
+        "rate_limit": {"rps": 100}
+      },
+      "tenants": {
+        "tenant1": {
+          "domains": ["tenant1.com"],
+          "inherits": "default",
+          "tls": {...}
+        }
+      }
+    }
+  }
+}
+```
+
+### API Endpoints
+
+- `GET /api/tenants` - List all tenants
+- `POST /api/tenants` - Create a new tenant
+- `GET /api/tenants/{name}` - Get tenant details
+- `PUT /api/tenants/{name}` - Update tenant
+- `DELETE /api/tenants/{name}` - Delete tenant
+
+### Tenant Properties
+
+- **Domains**: Domain names for the tenant
+- **Routes**: HTTP routes and handlers
+- **TLS**: SSL certificate configuration
+- **Rate Limit**: Request rate limiting
+- **Metrics**: Tenant-specific metrics collection
+
+## Advanced Caching with Predictive Warming
+
+ProxFlow includes an advanced caching layer with intelligent features for optimal performance.
+
+### Features
+
+- **Intelligent Caching**: Cache API responses to reduce backend load
+- **Predictive Cache Warming**: Analyze access patterns to preload frequently accessed data
+- **Cache Invalidation via Webhooks**: External systems can invalidate cache entries
+- **Partial Cache Updates**: Update specific parts of cached JSON data
+- **Distributed Cache Synchronization**: Keep cache consistent across multiple instances
+- **Configurable TTL and Size Limits**: Fine-tune cache behavior
+
+### Configuration
+
+In your Caddyfile:
+
+```
+cache {
+    ttl 10m
+    max_size 100
+    predictive_warming
+    webhook_path /cache/invalidate
+    distributed_sync {
+        peer http://peer1:2019
+        peer http://peer2:2019
+        sync_interval 30s
+    }
+}
+```
+
+### Cache Invalidation Webhook
+
+Send POST requests to `/cache/invalidate` with JSON payload:
+
+```json
+{
+  "action": "invalidate",
+  "key": "cache_key"
+}
+```
+
+Or invalidate by pattern:
+
+```json
+{
+  "action": "invalidate",
+  "pattern": "api/users"
+}
+```
+
+### Partial Updates
+
+Update specific JSON fields without invalidating the entire cache entry:
+
+```json
+{
+  "action": "partial_update",
+  "partial": {
+    "key": "user_123",
+    "path": "user.email",
+    "value": "newemail@example.com"
+  }
+}
+```
+
+### Parameters
+
+- `ttl`: Default time-to-live for cache entries (default 5m)
+- `max_size`: Maximum cache size in MB (default 100)
+- `predictive_warming`: Enable predictive cache warming
+- `webhook_path`: Path for cache invalidation webhooks (default /cache/invalidate)
+- `distributed_sync`: Configuration for multi-instance synchronization
+
+## Advanced Rate Limiting
+
+ProxFlow includes advanced rate limiting with multiple algorithms and distributed support.
+
+### Supported Algorithms
+
+- **Token Bucket**: Smooth rate limiting with burst capacity
+- **Leaky Bucket**: Request processing at a constant rate
+- **Sliding Window**: Time-based request counting
+
+### Rate Limiting Keys
+
+- **IP Address**: Rate limit by client IP
+- **User ID**: Rate limit by authenticated user
+- **API Key**: Rate limit by API key
+- **Custom Headers**: Rate limit by any HTTP header
+
+### Configuration
+
+In your Caddyfile:
+
+```
+rate_limit {
+    algorithm token_bucket
+    rate 10
+    burst 5
+    key ip
+    reject 429
+    distributed {
+        redis {
+            address localhost:6379
+            password secret
+            db 0
+        }
+        sync_interval 30s
+    }
+}
+```
+
+### Distributed Rate Limiting
+
+For multi-instance deployments, configure Redis-backed distributed rate limiting:
+
+```caddyfile
+rate_limit {
+    distributed {
+        redis {
+            address redis-cluster:6379
+            password mypassword
+            db 1
+        }
+        sync_interval 15s
+    }
+}
+```
+
+### Rejection Policies
+
+- **429**: Return HTTP 429 Too Many Requests
+- **delay**: Add delay before processing
+- **drop**: Silently drop the request
+
+## Request Replay and Traffic Shadowing
+
+ProxFlow supports traffic shadowing and replay for testing and monitoring.
+
+### Traffic Shadowing
+
+Capture production traffic and mirror it to staging/test environments:
+
+```caddyfile
+traffic_shadow {
+    sampling_rate 0.1
+    compare_responses
+    log_differences
+    target staging http://staging.example.com/api {
+        header X-Shadow true
+        timeout 10s
+        ignore_errors
+    }
+}
+```
+
+### Request Replay
+
+Store and replay captured requests for testing:
+
+```caddyfile
+traffic_shadow {
+    replay {
+        storage {
+            type redis
+            redis {
+                address localhost:6379
+                db 1
+            }
+        }
+        replay_rate 0.5
+        max_replays 5
+    }
+}
+```
+
+### Response Comparison
+
+Automatically compare responses between production and shadow environments to detect regressions:
+
+- Status code comparison
+- Response body comparison
+- Performance timing analysis
+- Configurable similarity thresholds
+
+### Storage Options
+
+- **Memory**: In-memory storage for development
+- **File**: File-based storage for persistence
+- **Redis**: Distributed storage for multi-instance deployments
+
+## Auto-Scaling Backend Pool Management
+
+ProxFlow includes intelligent auto-scaling backend pool management with service discovery integration.
+
+### Features
+
+- **Automatic Scaling**: Add/remove backend instances based on load and health
+- **Multi-Platform Discovery**: Kubernetes, Docker Swarm, and Consul integration
+- **Health Monitoring**: Continuous health checks with customizable thresholds
+- **Load-Based Scaling**: Scale up/down based on backend utilization
+- **Custom Health Checks**: Per-backend health check configuration
+
+### Service Discovery
+
+#### Kubernetes
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type kubernetes
+            kubernetes {
+                namespace default
+                service_name my-app
+                label_selector app=my-app
+            }
+        }
+    }
+}
+```
+
+#### Docker Swarm
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type docker_swarm
+            docker_swarm {
+                service_name my-app
+                network_name my-network
+            }
+        }
+    }
+}
+```
+
+#### Consul
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        service_discovery {
+            type consul
+            consul {
+                service_name my-app
+                address consul-server:8500
+                token my-token
+            }
+        }
+    }
+}
+```
+
+### Health Checks
+
+Configure health check parameters:
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        health_checks {
+            path /health
+            interval 30s
+            timeout 5s
+            unhealthy_threshold 3
+            healthy_threshold 2
+        }
+    }
+}
+```
+
+### Auto-Scaling Configuration
+
+```caddyfile
+reverse_proxy {
+    dynamic_upstreams auto_scaling {
+        scaling {
+            min_backends 1
+            max_backends 10
+            scale_up_threshold 0.8
+            scale_down_threshold 0.2
+            scale_cooldown 5m
+            provider kubernetes
+        }
+    }
+}
+```
+
+### Scaling Triggers
+
+- **Scale Up**: When average backend load exceeds `scale_up_threshold`
+- **Scale Down**: When average backend load falls below `scale_down_threshold`
+- **Health-Based**: Remove unhealthy backends, add healthy ones
+- **Cooldown**: Prevent rapid scaling operations
+
+### Supported Providers
+
+- **Kubernetes**: Horizontal Pod Autoscaling (HPA) integration
+- **Docker Swarm**: Service scaling via Docker API
+- **Manual**: Static backend management
+
+## Zero Downtime Certificate Rotation
+
+ProxFlow supports zero downtime certificate rotation with multiple certificate authorities and advanced TLS features.
+
+### Certificate Authorities
+
+- **Let's Encrypt**: Automatic ACME certificates
+- **ZeroSSL**: Alternative ACME provider
+- **Custom CA**: Support for internal certificate authorities
+
+### Advanced TLS Features
+
+- **OCSP Stapling**: Automatic OCSP response stapling for improved performance
+- **Encrypted SNI (ECH)**: Encrypted Client Hello for enhanced privacy
+- **Certificate Pinning**: Pin certificates to prevent man-in-the-middle attacks
+
+### Configuration
+
+```caddyfile
+tls {
+    protocols tls1.2 tls1.3
+    ciphers ECDHE-ECDSA-AES128-GCM-SHA256
+    curves x25519
+}
+```
+
+## gRPC Gateway with Protocol Translation
+
+ProxFlow includes a bidirectional gRPC gateway that translates between HTTP/REST and gRPC protocols.
+
+### Features
+
+- **Protocol Translation**: Automatic conversion between HTTP JSON and gRPC protobuf
+- **Bidirectional Communication**: Support for both request and response translation
+- **Streaming Support**: Handle gRPC streaming methods
+- **gRPC-Web Compatibility**: Support for web browser gRPC calls
+- **Built-in Reflection**: Automatic service discovery and method introspection
+
+### Configuration
+
+In your Caddyfile:
+
+```
+grpc_gateway localhost:50051 {
+    proto_file /path/to/service.proto
+    service user {
+        method GET UserService/GetUser
+        method POST UserService/CreateUser
+        streaming
+    }
+    enable_reflection
+    enable_grpc_web
+    allow_cors
+}
+```
+
+### Usage
+
+The gateway translates REST API calls to gRPC:
+
+```bash
+# REST call
+curl -X POST http://gateway/user/create \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John", "email": "john@example.com"}'
+
+# Becomes gRPC call to UserService.CreateUser
+```
+
+### Protocol Translation
+
+- **Request**: JSON → Protobuf
+- **Response**: Protobuf → JSON
+- **Headers**: HTTP headers ↔ gRPC metadata
+- **Status Codes**: HTTP status ↔ gRPC status codes
+
 ## [Features](https://caddyserver.com/features)
 
 - **Easy configuration** with the [Caddyfile](https://caddyserver.com/docs/caddyfile)

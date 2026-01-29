@@ -1,0 +1,47 @@
+:8890
+
+cache {
+	ttl 10m
+	max_size 50
+	predictive_warming
+	webhook_path /cache/invalidate
+	distributed_sync {
+		peer http://peer1:8890
+		peer http://peer2:8890
+		sync_interval 30s
+	}
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8890"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "cache",
+									"ttl": 600000000000,
+									"max_size": 50,
+									"predictive_warming": true,
+									"webhook_path": "/cache/invalidate",
+									"distributed_sync": {
+										"peers": [
+											"http://peer1:8890",
+											"http://peer2:8890"
+										],
+										"sync_interval": 30000000000
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,71 @@
+:8893
+
+traffic_shadow {
+	sampling_rate 0.1
+	compare_responses
+	log_differences
+	target staging http://staging.example.com/api {
+		header X-Shadow true
+		timeout 10s
+		ignore_errors
+	}
+	replay {
+		storage {
+			type redis
+			redis {
+				address localhost:6379
+				db 1
+			}
+		}
+		replay_rate 0.5
+		max_replays 5
+	}
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8893"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "traffic_shadow",
+									"targets": [
+										{
+											"name": "staging",
+											"url": "http://staging.example.com/api",
+											"headers": {
+												"X-Shadow": "true"
+											},
+											"timeout": 10000000000,
+											"ignore_errors": true
+										}
+									],
+									"sampling_rate": 0.1,
+									"compare_responses": true,
+									"log_differences": true,
+									"replay": {
+										"storage": {
+											"type": "redis",
+											"redis": {
+												"address": "localhost:6379",
+												"db": 1
+											}
+										},
+										"replay_rate": 0.5,
+										"max_replays": 5
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}

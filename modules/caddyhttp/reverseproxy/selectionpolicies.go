@@ -42,6 +42,7 @@ func init() {
 	caddy.RegisterModule(LeastConnSelection{})
 	caddy.RegisterModule(RoundRobinSelection{})
 	caddy.RegisterModule(WeightedRoundRobinSelection{})
+	caddy.RegisterModule(AdaptiveSelection{})
 	caddy.RegisterModule(FirstSelection{})
 	caddy.RegisterModule(IPHashSelection{})
 	caddy.RegisterModule(ClientIPHashSelection{})
@@ -87,6 +88,32 @@ type WeightedRoundRobinSelection struct {
 	totalWeight int
 }
 
+// LoadHistory holds the historical load data for an upstream.
+type LoadHistory struct {
+	loads []float64
+	smoothed float64
+}
+
+// AdaptiveSelection is a policy that uses machine learning to predict
+// traffic patterns and adjusts load balancing weights dynamically.
+// It collects historical request counts and uses exponential smoothing
+// to predict future load, then inverts the prediction to assign weights.
+type AdaptiveSelection struct {
+	// HistoryLength is the number of past intervals to keep for prediction.
+	// Default is 10.
+	HistoryLength int `json:"history_length,omitempty"`
+
+	// UpdateInterval is how often to update predictions. Default is 1m.
+	UpdateInterval caddy.Duration `json:"update_interval,omitempty"`
+
+	// Alpha is the smoothing factor for exponential smoothing (0-1). Default 0.3.
+	Alpha float64 `json:"alpha,omitempty"`
+
+	histories map[string]*LoadHistory
+	lastUpdate time.Time
+	mu         sync.RWMutex
+}
+
 // CaddyModule returns the Caddy module information.
 func (WeightedRoundRobinSelection) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
@@ -94,6 +121,14 @@ func (WeightedRoundRobinSelection) CaddyModule() caddy.ModuleInfo {
 		New: func() caddy.Module {
 			return new(WeightedRoundRobinSelection)
 		},
+	}
+}
+
+// CaddyModule returns the Caddy module information.
+func (AdaptiveSelection) CaddyModule() caddy.ModuleInfo {
+	return caddy.ModuleInfo{
+		ID:  "http.reverse_proxy.selection_policies.adaptive",
+		New: func() caddy.Module { return new(AdaptiveSelection) },
 	}
 }
 
@@ -119,11 +154,71 @@ func (r *WeightedRoundRobinSelection) UnmarshalCaddyfile(d *caddyfile.Dispenser)
 	return nil
 }
 
+// UnmarshalCaddyfile sets up the module from Caddyfile tokens.
+func (a *AdaptiveSelection) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	d.Next() // consume policy name
+	if d.NextArg() {
+		return d.ArgErr()
+	}
+	for d.NextBlock(0) {
+		switch d.Val() {
+		case "history_length":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			length, err := strconv.Atoi(d.Val())
+			if err != nil {
+				return d.Errf("invalid history_length: %v", err)
+			}
+			a.HistoryLength = length
+		case "update_interval":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			dur, err := caddy.ParseDuration(d.Val())
+			if err != nil {
+				return d.Errf("invalid update_interval: %v", err)
+			}
+			a.UpdateInterval = caddy.Duration(dur)
+		case "alpha":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			alpha, err := strconv.ParseFloat(d.Val(), 64)
+			if err != nil {
+				return d.Errf("invalid alpha: %v", err)
+			}
+			if alpha < 0 || alpha > 1 {
+				return d.Errf("alpha must be between 0 and 1")
+			}
+			a.Alpha = alpha
+		default:
+			return d.Errf("unrecognized option '%s'", d.Val())
+		}
+	}
+	return nil
+}
+
 // Provision sets up r.
 func (r *WeightedRoundRobinSelection) Provision(ctx caddy.Context) error {
 	for _, weight := range r.Weights {
 		r.totalWeight += weight
 	}
+	return nil
+}
+
+// Provision sets up the AdaptiveSelection.
+func (a *AdaptiveSelection) Provision(ctx caddy.Context) error {
+	if a.HistoryLength == 0 {
+		a.HistoryLength = 10
+	}
+	if a.UpdateInterval == 0 {
+		a.UpdateInterval = caddy.Duration(time.Minute)
+	}
+	if a.Alpha == 0 {
+		a.Alpha = 0.3
+	}
+	a.histories = make(map[string]*LoadHistory)
 	return nil
 }
 
@@ -166,6 +261,91 @@ func (r *WeightedRoundRobinSelection) Select(pool UpstreamPool, _ *http.Request,
 		return nil
 	}
 	return upstreams[index%len(upstreams)]
+}
+
+// Select returns an available host based on adaptive weights predicted by AI.
+func (a *AdaptiveSelection) Select(pool UpstreamPool, req *http.Request, w http.ResponseWriter) *Upstream {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	now := time.Now()
+	if now.Sub(a.lastUpdate) >= time.Duration(a.UpdateInterval) {
+		a.updatePredictions(pool)
+		a.lastUpdate = now
+	}
+
+	if len(pool) == 0 {
+		return nil
+	}
+
+	// Calculate predicted loads and weights
+	type upstreamWeight struct {
+		upstream *Upstream
+		weight   float64
+	}
+	var candidates []upstreamWeight
+
+	for _, upstream := range pool {
+		if !upstream.Available() {
+			continue
+		}
+		key := upstream.String()
+		history, exists := a.histories[key]
+		predicted := 1.0 // default
+		if exists && len(history.loads) > 0 {
+			predicted = history.smoothed
+		}
+		if predicted <= 0 {
+			predicted = 0.1
+		}
+		weight := 1.0 / predicted // higher weight for lower predicted load
+		candidates = append(candidates, upstreamWeight{upstream: upstream, weight: weight})
+	}
+
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	// Select based on weights, similar to weighted round robin
+	totalWeight := 0.0
+	for _, c := range candidates {
+		totalWeight += c.weight
+	}
+	if totalWeight == 0 {
+		return candidates[weakrand.Intn(len(candidates))].upstream
+	}
+	randVal := weakrand.Float64() * totalWeight
+	cumWeight := 0.0
+	for _, c := range candidates {
+		cumWeight += c.weight
+		if randVal <= cumWeight {
+			return c.upstream
+		}
+	}
+	return candidates[len(candidates)-1].upstream
+}
+
+// updatePredictions updates the smoothed predictions for each upstream.
+func (a *AdaptiveSelection) updatePredictions(pool UpstreamPool) {
+	for _, upstream := range pool {
+		key := upstream.String()
+		history, exists := a.histories[key]
+		if !exists {
+			history = &LoadHistory{}
+			a.histories[key] = history
+		}
+		currentLoad := float64(upstream.NumRequests())
+		history.loads = append(history.loads, currentLoad)
+		if len(history.loads) > a.HistoryLength {
+			history.loads = history.loads[1:]
+		}
+		// Exponential smoothing
+		if history.smoothed == 0 {
+			history.smoothed = currentLoad
+		} else {
+			history.smoothed = a.Alpha*currentLoad + (1-a.Alpha)*history.smoothed
+		}
+	}
 }
 
 // RandomChoiceSelection is a policy that selects
@@ -880,6 +1060,7 @@ var (
 	_ Selector = (*LeastConnSelection)(nil)
 	_ Selector = (*RoundRobinSelection)(nil)
 	_ Selector = (*WeightedRoundRobinSelection)(nil)
+	_ Selector = (*AdaptiveSelection)(nil)
 	_ Selector = (*FirstSelection)(nil)
 	_ Selector = (*IPHashSelection)(nil)
 	_ Selector = (*ClientIPHashSelection)(nil)
@@ -892,7 +1073,9 @@ var (
 
 	_ caddy.Provisioner = (*RandomChoiceSelection)(nil)
 	_ caddy.Provisioner = (*WeightedRoundRobinSelection)(nil)
+	_ caddy.Provisioner = (*AdaptiveSelection)(nil)
 
 	_ caddyfile.Unmarshaler = (*RandomChoiceSelection)(nil)
 	_ caddyfile.Unmarshaler = (*WeightedRoundRobinSelection)(nil)
+	_ caddyfile.Unmarshaler = (*AdaptiveSelection)(nil)
 )

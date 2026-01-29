@@ -863,6 +863,21 @@ func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			}
 			h.VerboseLogs = true
 
+		case "circuit_breaker":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			if h.CBRaw != nil {
+				return d.Err("circuit_breaker already specified")
+			}
+			cbType := d.Val()
+			modID := "http.reverse_proxy.circuit_breakers." + cbType
+			unm, err := caddyfile.UnmarshalModule(d, modID)
+			if err != nil {
+				return err
+			}
+			h.CBRaw = caddyconfig.JSON(unm, nil)
+
 		default:
 			return d.Errf("unrecognized subdirective %s", d.Val())
 		}

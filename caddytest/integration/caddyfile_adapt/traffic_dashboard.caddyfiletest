@@ -1,0 +1,31 @@
+:8886
+
+traffic_dashboard {
+    path /monitor
+    update_interval 2s
+}
+----------
+{
+    "apps": {
+        "http": {
+            "servers": {
+                "srv0": {
+                    "listen": [
+                        ":8886"
+                    ],
+                    "routes": [
+                        {
+                            "handle": [
+                                {
+                                    "handler": "traffic_dashboard",
+                                    "path": "/monitor",
+                                    "update_interval": 2000000000
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

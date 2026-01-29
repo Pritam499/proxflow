@@ -268,6 +268,10 @@ func (h *Handler) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("loading circuit breaker: %s", err)
 		}
 		h.CB = mod.(CircuitBreaker)
+		// Assign circuit breaker to all upstreams
+		for _, upstream := range h.Upstreams {
+			upstream.cb = h.CB
+		}
 	}
 	if h.DynamicUpstreamsRaw != nil {
 		mod, err := ctx.LoadModule(h, "DynamicUpstreamsRaw")

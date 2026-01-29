@@ -10,9 +10,11 @@ import (
 	_ "github.com/Pritam499/proxflow/v2/modules/caddypki"
 	_ "github.com/Pritam499/proxflow/v2/modules/caddypki/acmeserver"
 	_ "github.com/Pritam499/proxflow/v2/modules/caddytls"
+	_ "github.com/Pritam499/proxflow/v2/modules/caddytls/pinning"
 	_ "github.com/Pritam499/proxflow/v2/modules/caddytls/distributedstek"
 	_ "github.com/Pritam499/proxflow/v2/modules/caddytls/standardstek"
 	_ "github.com/Pritam499/proxflow/v2/modules/filestorage"
 	_ "github.com/Pritam499/proxflow/v2/modules/logging"
 	_ "github.com/Pritam499/proxflow/v2/modules/metrics"
+	_ "github.com/Pritam499/proxflow/v2/modules/tenants"
 )

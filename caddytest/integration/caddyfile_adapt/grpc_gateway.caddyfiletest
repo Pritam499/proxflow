@@ -1,0 +1,52 @@
+:8891
+
+grpc_gateway localhost:50051 {
+    proto_file /path/to/service.proto
+    service test {
+        method POST TestService/TestMethod
+        streaming
+    }
+    enable_reflection
+    enable_grpc_web
+    allow_cors
+}
+----------
+{
+    "apps": {
+        "http": {
+            "servers": {
+                "srv0": {
+                    "listen": [
+                        ":8891"
+                    ],
+                    "routes": [
+                        {
+                            "handle": [
+                                {
+                                    "handler": "grpc_gateway",
+                                    "backend": "localhost:50051",
+                                    "proto_files": [
+                                        "/path/to/service.proto"
+                                    ],
+                                    "services": {
+                                        "test": {
+                                            "methods": {
+                                                "POST": {
+                                                    "grpc_method": "TestService/TestMethod"
+                                                }
+                                            },
+                                            "streaming": true
+                                        }
+                                    },
+                                    "enable_reflection": true,
+                                    "enable_grpc_web": true,
+                                    "allow_cors": true
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

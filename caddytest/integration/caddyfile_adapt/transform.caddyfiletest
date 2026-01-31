@@ -1,0 +1,47 @@
+:8888
+
+transform {
+	header add X-Test "value"
+	body replace data.name "transformed"
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8888"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "transform",
+									"rules": [
+										{
+											"header_actions": [
+												{
+													"action": "add",
+													"name": "X-Test",
+													"value": "value"
+												}
+											],
+											"body_actions": [
+												{
+													"action": "replace",
+													"path": "data.name",
+													"value": "transformed"
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,57 @@
+:8892
+
+rate_limit {
+	algorithm token_bucket
+	rate 10
+	burst 5
+	key ip
+	reject 429
+	distributed {
+		redis {
+			address localhost:6379
+			password secret
+			db 0
+		}
+		sync_interval 30s
+	}
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8892"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "rate_limit",
+									"rules": [
+										{
+											"algorithm": "token_bucket",
+											"rate": 10,
+											"burst": 5,
+											"key": "ip",
+											"reject": "429"
+										}
+									],
+									"distributed": {
+										"redis": {
+											"address": "localhost:6379",
+											"password": "secret",
+											"db": 0
+										},
+										"sync_interval": 30000000000
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}

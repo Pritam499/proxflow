@@ -1,0 +1,51 @@
+:8887
+
+reverse_proxy 127.0.0.1:65535 {
+    circuit_breaker intelligent {
+        failure_threshold 0.6
+        recovery_timeout 30s
+        half_open_max_requests 5
+        latency_threshold 3s
+        min_requests 5
+        evaluation_window 30s
+        ramp_up_duration 15s
+    }
+}
+----------
+{
+    "apps": {
+        "http": {
+            "servers": {
+                "srv0": {
+                    "listen": [
+                        ":8887"
+                    ],
+                    "routes": [
+                        {
+                            "handle": [
+                                {
+                                    "handler": "reverse_proxy",
+                                    "circuit_breaker": {
+                                        "type": "intelligent",
+                                        "failure_threshold": 0.6,
+                                        "recovery_timeout": 30000000000,
+                                        "half_open_max_requests": 5,
+                                        "latency_threshold": 3000000000,
+                                        "min_requests": 5,
+                                        "evaluation_window": 30000000000,
+                                        "ramp_up_duration": 15000000000
+                                    },
+                                    "upstreams": [
+                                        {
+                                            "dial": "127.0.0.1:65535"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

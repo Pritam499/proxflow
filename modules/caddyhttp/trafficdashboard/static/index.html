@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProxFlow Traffic Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .metric { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .metric h3 { margin-top: 0; color: #333; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .chart { height: 300px; }
+        #latency-heatmap { height: 400px; }
+        #geo-map { height: 400px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ProxFlow Real-Time Traffic Dashboard</h1>
+
+        <div class="metric-grid">
+            <div class="metric">
+                <h3>Request Rate</h3>
+                <div id="request-rate">Loading...</div>
+            </div>
+            <div class="metric">
+                <h3>Error Rate</h3>
+                <div id="error-rate">Loading...</div>
+            </div>
+            <div class="metric">
+                <h3>Active Connections</h3>
+                <div id="active-conns">Loading...</div>
+            </div>
+        </div>
+
+        <div class="metric">
+            <h3>Latency Distribution</h3>
+            <div id="latency-data">Loading...</div>
+        </div>
+
+        <div class="metric">
+            <h3>Geographic Distribution</h3>
+            <div id="geo-data">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        let requestRateEl = document.getElementById('request-rate');
+        let errorRateEl = document.getElementById('error-rate');
+        let activeConnsEl = document.getElementById('active-conns');
+        let latencyEl = document.getElementById('latency-data');
+        let geoEl = document.getElementById('geo-data');
+
+        // Connect to SSE
+        const eventSource = new EventSource('/dashboard/events');
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateDashboard(data);
+        };
+
+        eventSource.onerror = function(err) {
+            console.error('SSE error:', err);
+        };
+
+        function updateDashboard(data) {
+            // Update metrics
+            requestRateEl.textContent = data.request_rate.toFixed(2) + ' req/s';
+            errorRateEl.textContent = data.error_rate.toFixed(2) + ' err/s';
+            activeConnsEl.textContent = data.active_conns;
+
+            // Update latency
+            latencyEl.innerHTML = `
+                <p>P50: ${data.latency.p50}ms</p>
+                <p>P95: ${data.latency.p95}ms</p>
+                <p>P99: ${data.latency.p99}ms</p>
+            `;
+
+            // Update geo
+            let geoHTML = '<ul>';
+            for (const [region, count] of Object.entries(data.geo_data)) {
+                geoHTML += `<li>${region}: ${count}</li>`;
+            }
+            geoHTML += '</ul>';
+            geoEl.innerHTML = geoHTML;
+        }
+    </script>
+</body>
+</html>

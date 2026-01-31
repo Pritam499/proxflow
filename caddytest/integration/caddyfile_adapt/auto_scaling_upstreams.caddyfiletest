@@ -1,0 +1,80 @@
+:8894
+
+reverse_proxy {
+	dynamic_upstreams auto_scaling {
+		service_discovery {
+			type static
+			static {
+				address localhost:8080
+				address localhost:8081
+			}
+		}
+		health_checks {
+			path /health
+			interval 30s
+			timeout 5s
+			unhealthy_threshold 3
+			healthy_threshold 2
+		}
+		scaling {
+			min_backends 1
+			max_backends 5
+			scale_up_threshold 0.8
+			scale_down_threshold 0.2
+			scale_cooldown 5m
+			provider kubernetes
+		}
+	}
+}
+----------
+{
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						":8894"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"handler": "reverse_proxy",
+									"upstreams": {
+										"source": {
+											"type": "auto_scaling",
+											"service_discovery": {
+												"type": "static",
+												"static": {
+													"addresses": [
+														"localhost:8080",
+														"localhost:8081"
+													]
+												}
+											},
+											"health_checks": {
+												"path": "/health",
+												"interval": 30000000000,
+												"timeout": 5000000000,
+												"unhealthy_threshold": 3,
+												"healthy_threshold": 2
+											},
+											"scaling": {
+												"min_backends": 1,
+												"max_backends": 5,
+												"scale_up_threshold": 0.8,
+												"scale_down_threshold": 0.2,
+												"scale_cooldown": 300000000000,
+												"provider": "kubernetes"
+											}
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}
